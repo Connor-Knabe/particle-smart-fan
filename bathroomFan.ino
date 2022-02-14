@@ -91,9 +91,11 @@ unsigned long lastTime = 0;
 bool fanNeedsToTurnOn = true;
 bool fanNeedsToTurnOff = false;
 int delayMins = 1;
+unsigned int nextTime = 0;    
 
 
 void loop(){
+
     char buff[64];
     int len = 64;
     
@@ -109,8 +111,7 @@ void loop(){
         }
         fanNeedsToTurnOn = true;
     }
-        
-        
+
     unsigned long nowOne = millis();
     if ((nowOne - lastTimeOne) >= 15*1000) {
 		lastTimeOne = nowOne;
@@ -122,8 +123,11 @@ void loop(){
         sprintf(tempStr, "%ld", tempInF);
         char humidStr[15];
         sprintf(humidStr, "%ld", humidity);
-        
-        Particle.publish("bathroom-fan-humidity", humidStr, 60, PRIVATE);
+
+        if (nextTime < millis()) {
+            Particle.publish("bathroom-fan-humidity", humidStr, 60, PRIVATE);
+            nextTime = millis() + 60*60*1000;
+        }
         
         if(humidity<62){
             delayMins = .1;
