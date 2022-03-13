@@ -14,6 +14,7 @@ int tinkerDigitalWrite(String command);
 int tinkerAnalogRead(String pin);
 int tinkerAnalogWrite(String command);
 int setHumidityTrigger(String value);
+int pauseFan(String command);
 
 int pinZero = A0;
 int pinOne = A1;
@@ -55,6 +56,8 @@ void setup() {
 	Particle.function("digitalwrite", tinkerDigitalWrite);
 	Particle.function("analogread", tinkerAnalogRead);
 	Particle.function("analogwrite", tinkerAnalogWrite);
+    Particle.function("pauseFan", pauseFan);
+    
     
     pinMode(pinZero, OUTPUT);
     pinMode(pinOne, OUTPUT);
@@ -88,11 +91,13 @@ void setup() {
 
 unsigned long lastTimeOne = 0;
 unsigned long lastTime = 0;
-bool fanNeedsToTurnOn = true;
-bool fanNeedsToTurnOff = false;
-int delayMins = 1;
+// bool fanNeedsToTurnOn = true;
+// bool fanNeedsToTurnOff = false;
+bool bathroomFanIsOn = false;
+int delayMins = 2;
+int delayMinsOne = 1;
 unsigned int nextTime = 0;    
-
+bool shouldPauseFan = false;
 
 void loop(){
 
@@ -105,15 +110,13 @@ void loop(){
     unsigned long now = millis();
     if ((now - lastTime) >=  delayMins * 60 * 1000) {
     	lastTime = now;
-        if(fanNeedsToTurnOff){
-            Particle.publish("bathroom_fan_off", NULL, 60,  PRIVATE);
-            fanNeedsToTurnOff = false;
+        if(shouldPauseFan){
+            shouldPauseFan = false;
         }
-        fanNeedsToTurnOn = true;
     }
 
     unsigned long nowOne = millis();
-    if ((nowOne - lastTimeOne) >= 15*1000) {
+    if ((nowOne - lastTimeOne) >= delayMinsOne * 60 * 1000) {
 		lastTimeOne = nowOne;
 
         long temperature = htu.readTemperature();
@@ -130,12 +133,17 @@ void loop(){
         }
         
         if(humidity<62){
-            delayMins = .1;
-        } else if(humidity>70 && fanNeedsToTurnOn) {
-            Particle.publish("bathroom_fan_on", NULL, 60, PRIVATE);
-            fanNeedsToTurnOn = false;
-            fanNeedsToTurnOff = true;
-            delayMins = 60;
+            delayMinsOne = .5;
+            if(bathroomFanIsOn){
+                Particle.publish("bathroom_fan_off", NULL, 60,  PRIVATE);
+                bathroomFanIsOn = false;
+            }
+        } else if(humidity>75 && !shouldPauseFan) {
+            if(!bathroomFanIsOn){
+                Particle.publish("bathroom_fan_on", NULL, 60, PRIVATE);
+                bathroomFanIsOn = true;
+            }
+            delayMinsOne = 2;
         }
         
         if(isNight){
@@ -155,6 +163,20 @@ bool isNight(){
     return Time.hour()>=20 && Time.hour()<=7;
 }
 
+int pauseFan(String p){
+    delayMins = 30;
+    if(bathroomFanIsOn){
+        Particle.publish("bathroom_fan_off", NULL, 60,  PRIVATE);
+        bathroomFanIsOn = false;
+    }
+    
+    if(!shouldPauseFan){
+        shouldPauseFan = true;
+    } else {
+        shouldPauseFan = false;
+    }
+    return 0;
+}
 
 /*******************************************************************************
  * Function Name  : tinkerDigitalRead
